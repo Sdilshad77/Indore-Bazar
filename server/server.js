@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import colors from "colors";
 import cors from "cors";
+import compression from "compression";
 import { connectDB } from "./config/dbConfig.js";
 import dns from "node:dns/promises";
 import { fileURLToPath } from "url";
@@ -35,6 +36,7 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Middleware
+app.use(compression());
 app.use(
     cors({
         origin: process.env.CLIENT_URL || "*",
@@ -56,14 +58,6 @@ app.use("/api/shops", shopRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/chat", chatBotRoutes);
 app.get("/api/reviews/featured", reviewController.getFeaturedReviews);
-
-// Home Route
-app.get("/", (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: "WELCOME TO INDORE BAZAR API",
-    });
-});
 
 // Health Check Route — shows which env vars are loaded
 app.get("/api/health", (req, res) => {
@@ -89,13 +83,25 @@ import { existsSync } from "fs";
 const clientDist = resolve(__dirname, "../client/dist");
 
 if (existsSync(resolve(clientDist, "index.html"))) {
-    app.use(express.static(clientDist));
+    app.use("/assets", express.static(resolve(clientDist, "assets"), {
+        maxAge: "365d",
+        immutable: true,
+    }));
+    app.use(express.static(clientDist, { maxAge: 0 }));
 
     app.use((req, res, next) => {
         if (req.method === "GET" && !req.path.startsWith("/api/")) {
             return res.sendFile(resolve(clientDist, "index.html"));
         }
         next();
+    });
+} else {
+    // Home Route (API-only mode, e.g. local dev without a client build)
+    app.get("/", (req, res) => {
+        res.status(200).json({
+            success: true,
+            message: "WELCOME TO INDORE BAZAR API",
+        });
     });
 }
 

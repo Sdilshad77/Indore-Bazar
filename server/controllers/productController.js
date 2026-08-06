@@ -1,7 +1,7 @@
 import Product from "../models/productModel.js"
 
 const getProducts = async (req, res) => {
-    const products = await Product.find().populate('shop')
+    const products = await Product.find().populate('shop').lean()
 
     if (!products) {
         res.status(404)
@@ -20,7 +20,7 @@ const getProducts = async (req, res) => {
 }
 
 const getProduct = async (req, res) => {
-    const product = await Product.findById(req.params.pid).populate("shop")
+    const product = await Product.findById(req.params.pid).populate("shop").lean()
 
     if (!product) {
         res.status(404)
@@ -45,7 +45,7 @@ const searchProduct = async (req, res) => {
             { description: { $regex: query, $options: "i" } },
             { category: { $regex: query, $options: "i" } },
         ],
-    }).populate("shop")
+    }).populate("shop").lean()
 
     res.status(200).json(products)
 }
