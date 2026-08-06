@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "node --watch server/server.js",
-    "build": "cd client && npm install && npm run build"
+    "build": "cd client && npm install && npm run build && node ../scripts/finish-build.mjs"
   },
   "author": "",
   "license": "ISC",

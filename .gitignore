@@ -10,6 +10,7 @@ client/node_modules/
 # Build output
 client/dist/
 client/dist-ssr/
+/dist/
 
 # Uploads (temp files)
 server/uploads/
