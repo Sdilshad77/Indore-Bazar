@@ -4,6 +4,30 @@ import Product from "../models/productModel.js";
 // The client gets the API key from the environment variable `GEMINI_API_KEY`.
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+// Fallback chain — Gemini 2.5 can hit 503 "high demand", so we retry on other models
+const MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-flash-latest",
+];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryable = (err) => {
+    const code = err?.status || err?.code || err?.statusCode;
+    const msg = (err?.message || "").toLowerCase();
+    return (
+        code === 503 ||
+        code === 429 ||
+        code === 500 ||
+        msg.includes("high demand") ||
+        msg.includes("unavailable") ||
+        msg.includes("quota") ||
+        msg.includes("rate limit")
+    );
+};
+
 export const getAnswer = async (req, res) => {
     try {
 
@@ -23,6 +47,12 @@ export const getAnswer = async (req, res) => {
         // System Prompt
         let prompt = `You are a smart AI shop assistant that helps users find products from the data provided.
 You will always receive an array of product objects (each containing name, description, category, price, stock, and shop details) also you can help with shops information like address.
+
+🌐 LANGUAGE RULE (very important):
+- ALWAYS respond in ENGLISH by default, no matter what.
+- If the user greets you or says "hello"/"hi", respond with: "Hello! 👋 How can I help you shop today?"
+- NEVER use words like "Namaste", "Kya", "Hai" or any Hindi/Hinglish words unless the user themselves wrote the message in Hindi — then and only then reply in Hindi.
+- Keep all product answers in English.
 
 Your task is to:
 
@@ -58,6 +88,9 @@ User: "milk"
 User: "bread"
 → "Fresh Bread is available at Sharma General Store for ₹25. 🍞"
 
+User: "hello"
+→ "Hello! 👋 How can I help you shop today?"
+
 ❌ If truly no match is found after thoroughly searching ALL product names, descriptions, and categories in the data:
 
 Reply exactly:
@@ -79,22 +112,54 @@ here are question : ${question}
 here are stock details : ${allStock}`
 
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-        });
+        const response = await generateWithFallback(prompt);
+
+        const text = Array.isArray(response.text)
+            ? response.text.join("")
+            : response.text;
 
         res.status(200).json({
             success: true,
-            message: response.text
+            message: text
         })
 
     } catch (error) {
         console.error("ChatBot Error:", error.message)
-        res.status(500)
-        throw new Error(error.message || "Something went wrong. Please try again.")
+        res.status(503)
+        throw new Error("AI is a bit busy right now (Gemini is under high demand). Please try again in a minute! 🙏")
     }
 
+}
+
+const generateWithFallback = async (prompt) => {
+    let lastError = null
+
+    for (let i = 0; i < MODELS.length; i++) {
+        const model = MODELS[i]
+        try {
+            const response = await ai.models.generateContent({
+                model,
+                contents: prompt,
+            })
+            if (response?.text) {
+                return response
+            }
+            lastError = new Error(`${model} returned empty response`)
+        } catch (err) {
+            lastError = err
+            console.error(`[ChatBot] Model "${model}" failed:`, err?.message || err)
+
+            if (!isRetryable(err)) {
+                throw err
+            }
+        }
+
+        if (i < MODELS.length - 1) {
+            await sleep(1500 * (i + 1))
+        }
+    }
+
+    throw lastError || new Error("All AI models failed")
 }
 
 

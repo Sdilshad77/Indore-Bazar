@@ -44,9 +44,21 @@ const orderSchema = new mongoose.Schema({
     coupon: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Coupon",
-    }, totalBillAmount: {
+    },
+    deliveryFee: {
+        type: Number,
+        required: true,
+        default: 0
+    },
+    totalBillAmount: {
         type: Number,
         required: true
+    },
+    paymentMethod: {
+        type: String,
+        enum: ["cod", "upi", "card"],
+        required: true,
+        default: "cod"
     }
 }, {
     timestamps: true

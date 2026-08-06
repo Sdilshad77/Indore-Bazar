@@ -24,7 +24,6 @@ console.log(
     "API Secret :",
     process.env.CLOUDINARY_API_SECRET ? "Loaded ✅" : "Missing ❌"
 );
-console.log("Config =>", cloudinary.config());
 console.log("======================================");
 
 const uploadToCloudinary = (fileBuffer) => {

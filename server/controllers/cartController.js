@@ -11,6 +11,7 @@ const getCart = async (req, res) => {
         res.status(200).json({
             products: []
         })
+        return
     }
 
     res.status(200).json(cart)
@@ -59,7 +60,7 @@ const addToCart = async (req, res) => {
             // Check total quantity against stock
             if (cart.products[productIndex].qty > product.stock) {
                 res.status(400)
-                throw new Error("Quamtity Exceeds Avaialable Stock")
+                throw new Error("Quantity Exceeds Available Stock")
             }
 
 

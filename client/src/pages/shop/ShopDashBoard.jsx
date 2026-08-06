@@ -1,221 +1,229 @@
-import { Package, ShoppingBag, Tag, TrendingUp, TrendingDown, IndianRupee } from 'lucide-react';
-import ShopOwnerLayout from '../../components/shop/ShopOwnerLayout';
-import { useDispatch, useSelector } from 'react-redux';
-import { useEffect } from 'react';
-import { toast } from 'react-toastify';
-import LoadingScreen from '../../components/LoadingScreen';
-import { getAllCoupons, getAllProducts, getMyShopDetails, getMyShopOrders } from '../../features/shop/shopSlice';
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import { ArrowRight, Clock, Package, Receipt, Store } from "lucide-react";
+import { createShop, getMyShop } from "../../store/slices/shopSlice.js";
+import { getProducts } from "../../store/slices/productSlice.js";
+import ShopNav from "../../components/shop/ShopNav.jsx";
+import Spinner from "../../components/Spinner.jsx";
+import { formatINR } from "../../utils/format.js";
+import { toastError, toastSuccess } from "../../utils/toast.js";
+import API from "../../api/axios.js";
 
-function ShopDashboard() {
+export default function ShopDashboard() {
+  const dispatch = useDispatch();
+  const { myShop } = useSelector((state) => state.shops);
+  const { products } = useSelector((state) => state.products);
 
-    const { user } = useSelector(state => state.auth)
-    const { shop, shopLoading, shopSuccess, shopError, shopErrorMessage, shopProducts, shopOrders, shopCoupons } = useSelector(state => state.shop)
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ name: "", description: "", address: "", shopPhone: "" });
+  const [creating, setCreating] = useState(false);
+  const [orders, setOrders] = useState([]);
 
-    const dispatch = useDispatch()
+  useEffect(() => {
+    dispatch(getMyShop()).finally(() => setLoading(false));
+    dispatch(getProducts());
+  }, [dispatch]);
 
-    // Revenue
-    const totalRevenue = shopOrders.reduce((acc, order) => acc + order.totalBillAmount, 0)
-
-    // Step 1: fetch shop details once on mount
-    useEffect(() => {
-        dispatch(getMyShopDetails())
-    }, [])
-
-    // Step 2: fetch dependent data ONLY after shop._id is available
-    // This prevents getAllProducts from firing before shopId exists
-    useEffect(() => {
-        if (!shop?._id) return
-        dispatch(getAllProducts())
-        dispatch(getMyShopOrders())
-        dispatch(getAllCoupons())
-    }, [shop?._id])
-
-    // ── separate effect: show error toast with dedup id to prevent spam ──
-    useEffect(() => {
-        if (shopError && shopErrorMessage) {
-            toast.error(shopErrorMessage, { position: "top-center", toastId: 'shop-err' })
-        }
-    }, [shopError, shopErrorMessage])
-
-    const colors = {
-        pageBg: '#070d09',
-        cardBg: '#0f1c16',
-        cardHeadBg: '#13241c',
-        border: 'rgba(52,211,153,0.18)',
-        borderSoft: 'rgba(52,211,153,0.1)',
-        text: '#e7f6ee',
-        textMuted: '#7fa593',
-        textFaint: '#5a7a6a',
-        emerald: '#34d399',
-        emeraldBg: 'rgba(52,211,153,0.12)',
-        blue: '#85b7eb',
-        blueBg: 'rgba(133,183,235,0.12)',
-        amber: '#fac775',
-        amberBg: 'rgba(250,199,117,0.12)',
-        red: '#f09595',
-        redBg: 'rgba(226,75,74,0.12)',
-    };
-
-    const statCardStyle = {
-        background: colors.cardBg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: '16px',
-        padding: '22px',
-    };
-
-    // Only show full loading screen on very first load
-    if (shopLoading && !shop) {
-        return <LoadingScreen loadingMessage='Shop Profile Loading...' />
+  useEffect(() => {
+    if (myShop) {
+      API.get("/api/shop-owner/order/")
+        .then((res) => setOrders(res.data))
+        .catch(() => {});
     }
+  }, [myShop]);
 
+  const myProducts = useMemo(
+    () => products.filter((p) => p.shop?._id === myShop?._id),
+    [products, myShop]
+  );
+
+  const stats = useMemo(
+    () => ({
+      revenue: orders.reduce(
+        (a, o) => (o.status !== "cancelled" ? a + o.totalBillAmount : a),
+        0
+      ),
+      pending: orders.filter((o) => o.status === "placed").length,
+      total: orders.length,
+    }),
+    [orders]
+  );
+
+  const create = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    const res = await dispatch(createShop(form));
+    setCreating(false);
+    if (res.meta.requestStatus === "fulfilled") {
+      toastSuccess("Shop request sent to admin for approval!");
+      dispatch(getMyShop());
+    } else {
+      toastError(res.payload);
+    }
+  };
+
+  if (loading) {
     return (
-        <ShopOwnerLayout activePage="Dashboard">
-            <div style={{ background: colors.pageBg, padding: '24px', borderRadius: '20px', fontFamily: "'DM Sans', sans-serif" }}>
-
-                {/* STAT CARDS */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px', marginBottom: '28px' }}>
-
-                    <div style={statCardStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                            <div style={{ padding: '10px', background: colors.emeraldBg, borderRadius: '10px' }}>
-                                <Package style={{ width: '22px', height: '22px', color: colors.emerald }} />
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: colors.emerald }}>
-                                <TrendingUp style={{ width: '14px', height: '14px' }} />
-                                <span>12%</span>
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '30px', fontWeight: 800, color: colors.text, fontFamily: "'Syne', sans-serif" }}>{shopProducts.length}</div>
-                        <div style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>Total Products</div>
-                    </div>
-
-                    <div style={statCardStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                            <div style={{ padding: '10px', background: colors.blueBg, borderRadius: '10px' }}>
-                                <ShoppingBag style={{ width: '22px', height: '22px', color: colors.blue }} />
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: colors.emerald }}>
-                                <TrendingUp style={{ width: '14px', height: '14px' }} />
-                                <span>8%</span>
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '30px', fontWeight: 800, color: colors.text, fontFamily: "'Syne', sans-serif" }}>{shopOrders.length}</div>
-                        <div style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>Total Orders</div>
-                    </div>
-
-                    <div style={statCardStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                            <div style={{ padding: '10px', background: colors.emeraldBg, borderRadius: '10px' }}>
-                                <IndianRupee style={{ width: '22px', height: '22px', color: colors.emerald }} />
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: colors.red }}>
-                                <TrendingDown style={{ width: '14px', height: '14px' }} />
-                                <span>3%</span>
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '30px', fontWeight: 800, color: colors.text, fontFamily: "'Syne', sans-serif" }}>₹{totalRevenue}</div>
-                        <div style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>Today's Revenue</div>
-                    </div>
-
-                    <div style={statCardStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                            <div style={{ padding: '10px', background: colors.amberBg, borderRadius: '10px' }}>
-                                <Tag style={{ width: '22px', height: '22px', color: colors.amber }} />
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: colors.emerald }}>
-                                <TrendingUp style={{ width: '14px', height: '14px' }} />
-                                <span>5%</span>
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '30px', fontWeight: 800, color: colors.text, fontFamily: "'Syne', sans-serif" }}>{shopCoupons.length}</div>
-                        <div style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>Active Coupons</div>
-                    </div>
-                </div>
-
-                {/* RECENT ORDERS + TOP PRODUCTS */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
-
-                    {/* RECENT ORDERS */}
-                    <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: '16px', overflow: 'hidden' }}>
-                        <div style={{ background: colors.cardHeadBg, borderBottom: `1px solid ${colors.border}`, padding: '16px 20px' }}>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: colors.text }}>Recent Orders</h3>
-                        </div>
-                        <div style={{ padding: '8px 20px 4px' }}>
-                            {shopOrders.length === 0 && (
-                                <p style={{ color: colors.textFaint, fontSize: '14px', padding: '20px 0', textAlign: 'center' }}>No orders yet</p>
-                            )}
-                            {
-                                shopOrders.map((order, idx) => (
-                                    <div
-                                        key={order._id}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            padding: '14px 0',
-                                            borderTop: idx === 0 ? 'none' : `1px solid ${colors.borderSoft}`,
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ fontWeight: 600, fontSize: '14px', color: colors.text }}>
-                                                #ORD-{order._id[0] + order._id[1] + order._id[2] + order._id[3]}
-                                            </div>
-                                            <div style={{ fontSize: '12px', color: colors.textMuted, marginTop: '2px' }}>{order.user.name}</div>
-                                            <div style={{ fontSize: '12px', color: colors.textFaint }}>{order.user.email}</div>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontWeight: 700, fontSize: '14px', color: colors.emerald, fontFamily: "'Syne', sans-serif" }}>₹{order.totalBillAmount}</div>
-                                            <div style={{ display: 'inline-block', padding: '4px 10px', fontSize: '11px', fontWeight: 600, background: colors.emeraldBg, color: colors.emerald, borderRadius: '999px', marginTop: '6px' }}>
-                                                {order.status}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            }
-                        </div>
-                        <div style={{ height: '16px' }} />
-                    </div>
-
-                    {/* TOP SELLING PRODUCTS */}
-                    <div style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: '16px', overflow: 'hidden' }}>
-                        <div style={{ background: colors.cardHeadBg, borderBottom: `1px solid ${colors.border}`, padding: '16px 20px' }}>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: colors.text }}>Top Selling Products</h3>
-                        </div>
-                        <div style={{ padding: '8px 20px 4px' }}>
-                            {shopProducts.length === 0 && (
-                                <p style={{ color: colors.textFaint, fontSize: '14px', padding: '20px 0', textAlign: 'center' }}>No products yet</p>
-                            )}
-                            {shopProducts.slice(0, 5).map((product, idx) => (
-                                <div
-                                    key={product._id}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '14px',
-                                        padding: '14px 0',
-                                        borderTop: idx === 0 ? 'none' : `1px solid ${colors.borderSoft}`,
-                                    }}
-                                >
-                                    <div style={{ width: '52px', height: '52px', background: colors.emeraldBg, borderRadius: '12px', flexShrink: 0, overflow: 'hidden' }}>
-                                        {product.productImage
-                                            ? <img src={product.productImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package style={{ width: '22px', height: '22px', color: colors.emerald }} /></div>
-                                        }
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: 500, fontSize: '14px', color: colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</div>
-                                        <div style={{ fontSize: '12px', color: colors.textFaint, marginTop: '2px' }}>{product.category} · {product.stock} in stock</div>
-                                    </div>
-                                    <div style={{ fontWeight: 700, fontSize: '14px', color: colors.emerald, fontFamily: "'Syne', sans-serif", flexShrink: 0 }}>₹{product.price}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div style={{ height: '4px' }} />
-                    </div>
-                </div>
-            </div>
-        </ShopOwnerLayout>
+      <div className="max-w-5xl mx-auto px-4 py-16 flex justify-center">
+        <Spinner size="lg" />
+      </div>
     );
-}
+  }
 
-export default ShopDashboard;
+  // No shop → create
+  if (!myShop) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8">
+        <div className="bg-white rounded-3xl border border-line p-8 md:p-10 max-w-xl mx-auto animate-fade-up">
+          <span className="h-14 w-14 rounded-2xl bg-primary-light text-primary flex items-center justify-center">
+            <Store size={26} />
+          </span>
+          <h1 className="text-2xl font-extrabold mt-4">Open your shop on Indore Bazar 🏪</h1>
+          <p className="text-sm text-muted mt-2">
+            List your products, manage orders & grow your business. Your request goes to our
+            admin for quick approval.
+          </p>
+
+          <form onSubmit={create} className="mt-6 space-y-4">
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Shop name"
+              className="w-full bg-surface rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-4 focus:ring-primary/15 border border-transparent focus:border-primary transition"
+            />
+            <textarea
+              required
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Short description about your shop"
+              rows={3}
+              className="w-full bg-surface rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-4 focus:ring-primary/15 border border-transparent focus:border-primary transition resize-none"
+            />
+            <input
+              required
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="Shop address"
+              className="w-full bg-surface rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-4 focus:ring-primary/15 border border-transparent focus:border-primary transition"
+            />
+            <input
+              required
+              type="tel"
+              maxLength={10}
+              value={form.shopPhone}
+              onChange={(e) => setForm({ ...form, shopPhone: e.target.value.replace(/\D/g, "") })}
+              placeholder="Shop phone number"
+              className="w-full bg-surface rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-4 focus:ring-primary/15 border border-transparent focus:border-primary transition"
+            />
+            <button
+              type="submit"
+              disabled={creating}
+              className="w-full bg-primary text-white font-extrabold py-4 rounded-2xl hover:bg-primary-dark transition disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {creating ? <Spinner size="sm" light /> : <>Submit for approval <ArrowRight size={17} /></>}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Pending shop
+  if (myShop.status !== "accepted") {
+    return (
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8">
+        <ShopNav shopName={myShop.name} />
+        <div className="bg-white rounded-3xl border border-line p-10 text-center max-w-lg mx-auto">
+          <span className="text-5xl">⏳</span>
+          <h1 className="text-xl font-extrabold mt-4">{myShop.name}</h1>
+          <p className="text-sm text-muted mt-2">
+            Your shop is <b className="text-amber-600 uppercase">{myShop.status}</b> — an admin
+            will review your request shortly. You'll be able to add products once approved.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 lg:px-6 py-8">
+      <ShopNav shopName={myShop.name} />
+
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Welcome, {myShop.name} 👋</h1>
+          <p className="text-sm text-muted mt-1">Here's how your shop is doing today</p>
+        </div>
+        <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1.5 rounded-full">
+          ✓ Approved & live
+        </span>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white rounded-2xl border border-line p-5 min-w-0">
+          <p className="text-xs text-muted font-bold uppercase flex items-center gap-1.5">
+            <Package size={14} className="text-primary" /> Products
+          </p>
+          <p className="text-2xl sm:text-3xl font-extrabold mt-2 truncate">{myProducts.length}</p>
+          <Link to="/seller/products" className="text-xs font-bold text-primary hover:underline mt-1 inline-block">
+            Manage →
+          </Link>
+        </div>
+        <div className="bg-white rounded-2xl border border-line p-5 min-w-0">
+          <p className="text-xs text-muted font-bold uppercase flex items-center gap-1.5">
+            <Receipt size={14} className="text-primary" /> Orders
+          </p>
+          <p className="text-2xl sm:text-3xl font-extrabold mt-2 truncate">{stats.total}</p>
+          <p className="text-xs text-amber-600 font-semibold mt-1">{stats.pending} pending action</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-line p-5 min-w-0">
+          <p className="text-xs text-muted font-bold uppercase flex items-center gap-1.5">
+            <Clock size={14} className="text-primary" /> Revenue
+          </p>
+          <p className="text-2xl sm:text-3xl font-extrabold mt-2 text-primary truncate">{formatINR(stats.revenue)}</p>
+          <p className="text-xs text-muted mt-1">From {stats.total} order{stats.total === 1 ? "" : "s"}</p>
+        </div>
+      </div>
+
+      {/* Recent orders */}
+      <div className="bg-white rounded-3xl border border-line p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-extrabold">Recent orders</h2>
+          <Link to="/seller/orders" className="text-sm font-bold text-primary hover:underline">
+            View all →
+          </Link>
+        </div>
+        {orders.length === 0 ? (
+          <p className="text-sm text-muted text-center py-8">
+            No orders yet — share your shop link to start selling! 🚀
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {orders.slice(0, 5).map((o) => (
+              <div key={o._id} className="flex items-center justify-between gap-3 bg-surface rounded-2xl p-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold text-primary">
+                    {o.user?.name?.[0]}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold truncate">{o.user?.name}</p>
+                    <p className="text-xs text-muted">#{o._id.slice(-6).toUpperCase()} · {o.products?.length} items</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-extrabold text-sm">{formatINR(o.totalBillAmount)}</p>
+                  <span className={`text-[10px] font-bold uppercase ${o.status === "cancelled" ? "text-red-500" : o.status === "delivered" ? "text-green-600" : "text-amber-600"}`}>
+                    {o.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

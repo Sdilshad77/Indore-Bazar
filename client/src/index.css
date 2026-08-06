@@ -1,60 +1,102 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
-
 @import "tailwindcss";
 
-*, *::before, *::after {
-  box-sizing: border-box;
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #00a862;
+  --color-primary-dark: #008f53;
+  --color-primary-light: #e7f8f0;
+  --color-accent: #fb8c00;
+  --color-accent-light: #fff4e5;
+  --color-ink: #171a19;
+  --color-muted: #6b7280;
+  --color-surface: #f6f8f7;
+  --color-line: #e7ebe9;
 }
 
-html, body {
-  overflow-x: hidden;
-  max-width: 100vw;
+html {
+  scroll-behavior: smooth;
 }
 
-* {
-  font-family: "Inter", sans-serif;
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
 }
 
-
-/* ── Global Dark Select / Dropdown Theme ─────────────────────────── */
-select,
-select option {
-  background-color: #0d1a13 !important;
-  color: #c8f0d8 !important;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-select {
-  border: 1px solid rgba(0, 232, 123, 0.22) !important;
-  border-radius: 10px !important;
-  font-size: 13px !important;
-  outline: none !important;
-  cursor: pointer !important;
-  transition: border-color 0.2s ease !important;
-  appearance: none !important;
-  -webkit-appearance: none !important;
+.hide-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.hide-scroll::-webkit-scrollbar-thumb {
+  background: #d3d9d6;
+  border-radius: 999px;
 }
 
-select:focus,
-select:hover {
-  border-color: rgba(0, 232, 123, 0.55) !important;
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fadeUp 0.45s ease both;
 }
 
-select option:hover,
-select option:checked,
-select option:focus {
-  background-color: rgba(0, 232, 123, 0.18) !important;
-  color: #00e87b !important;
+@keyframes popIn {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-pop {
+  animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* Date input dark theme */
-input[type="date"] {
-  background-color: #0d1a13 !important;
-  color: #c8f0d8 !important;
-  border: 1px solid rgba(0, 232, 123, 0.22) !important;
-  border-radius: 10px !important;
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s ease both;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.6) sepia(1) saturate(4) hue-rotate(100deg);
-  cursor: pointer;
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, #ecefed 25%, #f5f7f6 50%, #ecefed 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

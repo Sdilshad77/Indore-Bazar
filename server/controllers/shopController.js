@@ -20,7 +20,7 @@ const getShops = async (req, res) => {
 const getShop = async (req, res) => {
     const shop = await Shop.findById(req.params.sid)
 
-    if (!shop) {
+    if (!shop || shop.status !== "accepted") {
         res.status(404)
         throw new Error('Shop Not Found')
     }

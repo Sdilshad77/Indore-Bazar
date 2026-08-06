@@ -23,7 +23,7 @@ const applyCoupon = async (req, res) => {
         throw new Error("Please Send Coupon & Shop Id")
     }
 
-    const couponExists = await Coupon.findOne({ couponCode: couponCode })
+    const couponExists = await Coupon.findOne({ couponCode: couponCode.trim().toUpperCase() })
 
     if (!couponExists) {
         res.status(404)

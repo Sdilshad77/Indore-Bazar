@@ -14,6 +14,11 @@ const forAuthUsers = async (req, res, next) => {
                 throw new Error('You are not Authorised! : Invalid Token')
             }
 
+            if (!user.isActive) {
+                res.status(403)
+                throw new Error('Your account has been deactivated. Please contact support.')
+            }
+
             req.user = user
             next()
         } else {
@@ -55,6 +60,9 @@ const forAdmin = async (req, res, next) => {
                 throw new Error('You are not Authorised! : Admin Only Access')
             }
 
+        } else {
+            res.status(400)
+            throw new Error('You are not Authorised! No Token Found!')
         }
 
 

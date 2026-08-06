@@ -22,7 +22,7 @@ router.get("/order/", protect.forAuthUsers, shopOwnerController.getMyShopOrders)
 router.put("/order/:oid", protect.forAuthUsers, shopOwnerController.updateOrder)
 
 // Update Product
-router.put("/product/:pid", protect.forAuthUsers, shopOwnerController.updateProduct)
+router.put("/product/:pid", protect.forAuthUsers, upload.single('productImage'), shopOwnerController.updateProduct)
 
 // Delete Product
 router.delete("/product/:pid", protect.forAuthUsers, shopOwnerController.deleteProduct)

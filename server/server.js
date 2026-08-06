@@ -26,6 +26,7 @@ import orderRoutes from "./routes/orderRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
 import couponRoutes from "./routes/couponRoutes.js";
 import chatBotRoutes from "./routes/chatBotRoutes.js";
+import reviewController from "./controllers/reviewController.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,6 +55,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/shops", shopRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/chat", chatBotRoutes);
+app.get("/api/reviews/featured", reviewController.getFeaturedReviews);
 
 // Home Route
 app.get("/", (req, res) => {
@@ -80,6 +82,22 @@ app.get("/api/health", (req, res) => {
 
     
 });
+
+// Serve built React client in production (single SPA host)
+import { existsSync } from "fs";
+
+const clientDist = resolve(__dirname, "../client/dist");
+
+if (existsSync(resolve(clientDist, "index.html"))) {
+    app.use(express.static(clientDist));
+
+    app.use((req, res, next) => {
+        if (req.method === "GET" && !req.path.startsWith("/api/")) {
+            return res.sendFile(resolve(clientDist, "index.html"));
+        }
+        next();
+    });
+}
 
 // Error Handler
 app.use(errorHandler);

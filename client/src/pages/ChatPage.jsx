@@ -1,373 +1,202 @@
-import { useState, useRef, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { sendMessage, resetChat } from '../features/chat/chatSlice';
-import { ShoppingBag, Send } from 'lucide-react';
+import { useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Bot, Eraser, Send, Sparkles } from "lucide-react";
+import { askAI, clearChat } from "../store/slices/chatSlice.js";
+import Spinner from "../components/Spinner.jsx";
+
+const SUGGESTIONS = [
+  { icon: "🥛", text: "milk" },
+  { icon: "🍞", text: "bread" },
+  { icon: "🥦", text: "vegetables for the week" },
+  { icon: "🍿", text: "snacks under ₹200" },
+  { icon: "💪", text: "healthy breakfast ideas" },
+  { icon: "🎂", text: "something sweet" },
+];
+
+const QUICK_START = [
+  { icon: "🥛", label: "Dairy", msg: "best dairy products" },
+  { icon: "🍞", label: "Bakery", msg: "fresh bakery items" },
+  { icon: "🍎", label: "Fruits", msg: "fresh fruits" },
+  { icon: "🍿", label: "Snacks", msg: "snacks under ₹200" },
+  { icon: "🥦", label: "Vegetables", msg: "vegetables for the week" },
+  { icon: "🧃", label: "Beverages", msg: "cold drinks and juices" },
+];
 
 export default function ChatPage() {
+  const dispatch = useDispatch();
+  const { messages, isLoading } = useSelector((state) => state.chat);
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const [input, setInput] = useState("");
+  const bodyRef = useRef(null);
 
-    const dispatch = useDispatch()
-
-    const { chat, chatLoading, chatError, chatSuccess, chatErrorMessage } = useSelector(state => state.chat)
-
-    const [messages, setMessages] = useState([
-        {
-            _id: 1,
-            text: "Hello! I'm the IndoreMart Assistant. I can help you find products, locate shops, check prices, and answer questions about our services. What are you looking for today?",
-            sender: 'ai',
-            timestamp: new Date(),
-        },
-    ]);
-
-    const handleChatHistory = (message) => {
-        setMessages(prev => [...prev, message])
+  useEffect(() => {
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
+  }, [messages, isLoading]);
 
-    const [inputValue, setInputValue] = useState('');
-    const messagesEndRef = useRef(null);
+  const send = (text) => {
+    const q = (text || input).trim();
+    if (!q || isLoading) return;
+    setInput("");
+    dispatch(askAI(q));
+  };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
+  return (
+    <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6">
+      <Link
+        to="/"
+        className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-ink mb-5 transition"
+      >
+        <ArrowLeft size={16} /> Back to store
+      </Link>
 
-    useEffect(() => {
-        scrollToBottom();
-        if (chatSuccess) {
-            handleChatHistory({
-                _id: crypto.randomUUID(),
-                text: chat.message,
-                sender: 'ai',
-                timestamp: new Date(),
-            })
-            dispatch(resetChat())
-        }
-    }, [chatSuccess]);
-
-    const handleSendMessage = (e) => {
-        e.preventDefault()
-        if (!inputValue.trim()) return
-
-        handleChatHistory({
-            _id: crypto.randomUUID(),
-            text: inputValue,
-            sender: 'user',
-            timestamp: new Date(),
-        })
-
-        dispatch(sendMessage(inputValue))
-        setInputValue("")
-        setTimeout(scrollToBottom, 100)
-    };
-
-    // ── design tokens (inline so Tailwind purge never affects them) ──
-    const c = {
-        pageBg:      '#070d09',
-        headerBg:    '#0a1410',
-        border:      'rgba(52,211,153,0.18)',
-        borderSoft:  'rgba(52,211,153,0.1)',
-        inputBg:     '#0d1813',
-        emerald:     '#34d399',
-        emeraldBg:   'rgba(52,211,153,0.12)',
-        emeraldDark: '#059669',
-        text:        '#e7f6ee',
-        textMuted:   '#7fa593',
-        textFaint:   '#4a6a5a',
-        aiBubbleBg:  '#0f1c16',
-        aiBubbleBorder: 'rgba(52,211,153,0.15)',
-        userBubbleBg: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
-        dotColor:    '#34d399',
-    };
-
-    const css = `
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
-
-        .chat-root {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            background: ${c.pageBg};
-            font-family: 'DM Sans', sans-serif;
-            position: relative;
-        }
-
-        /* ambient grid */
-        .chat-grid {
-            position: fixed;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(52,211,153,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(52,211,153,0.03) 1px, transparent 1px);
-            background-size: 44px 44px;
-            mask-image: radial-gradient(ellipse 70% 50% at 50% 0%, black 20%, transparent 90%);
-            -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 0%, black 20%, transparent 90%);
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        /* scrollbar */
-        .chat-messages::-webkit-scrollbar { width: 6px; }
-        .chat-messages::-webkit-scrollbar-thumb {
-            background: rgba(52,211,153,0.2);
-            border-radius: 10px;
-        }
-
-        /* message bubble fade-in */
-        @keyframes msgIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-        .msg-animate { animation: msgIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both; }
-
-        /* dot typing */
-        @keyframes dotBounce {
-            0%,80%,100% { transform: scale(0.6); opacity: 0.4; }
-            40%          { transform: scale(1.2); opacity: 1; }
-        }
-        .dot1 { animation: dotBounce 1.3s ease-in-out infinite both 0s; }
-        .dot2 { animation: dotBounce 1.3s ease-in-out infinite both 0.18s; }
-        .dot3 { animation: dotBounce 1.3s ease-in-out infinite both 0.36s; }
-
-        /* send button */
-        .send-btn {
-            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
-            color: #030f07;
-            border: none;
-            padding: 0 22px;
-            height: 48px;
-            border-radius: 14px;
-            font-family: 'DM Sans', sans-serif;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            flex-shrink: 0;
-            transition: opacity 0.15s, transform 0.12s;
-            box-shadow: 0 0 20px rgba(52,211,153,0.25);
-        }
-        .send-btn:hover { opacity: 0.9; }
-        .send-btn:active { transform: scale(0.96); }
-        .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-        /* input */
-        .chat-input {
-            flex: 1;
-            height: 48px;
-            background: ${c.inputBg};
-            border: 1px solid ${c.border};
-            border-radius: 14px;
-            padding: 0 16px;
-            color: ${c.text};
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.15s;
-        }
-        .chat-input::placeholder { color: ${c.textFaint}; }
-        .chat-input:focus { border-color: rgba(52,211,153,0.55); }
-
-        @media(max-width:480px) {
-            .send-btn { padding: 0 14px; }
-            .send-btn .send-label { display: none; }
-            .chat-header-text { font-size: 15px !important; }
-        }
-    `;
-
-    return (
-        <div className="chat-root">
-            <style>{css}</style>
-            <div className="chat-grid" />
-
-            {/* ── HEADER ── */}
-            <div style={{
-                position: 'fixed',
-                top: 0,
-                width: '100%',
-                zIndex: 10,
-                background: c.headerBg,
-                borderBottom: `1px solid ${c.border}`,
-                padding: '14px 20px',
-                backdropFilter: 'blur(10px)',
-            }}>
-                <div style={{ maxWidth: '780px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                        width: '44px', height: '44px',
-                        background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
-                        borderRadius: '12px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 20px rgba(52,211,153,0.35)',
-                        flexShrink: 0,
-                    }}>
-                        <ShoppingBag style={{ width: '22px', height: '22px', color: '#030f07' }} />
-                    </div>
-                    <div>
-                        <h1 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: c.emerald, fontFamily: "'Syne', sans-serif" }}>
-                            IndoreMart Assistant
-                        </h1>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.emerald, boxShadow: `0 0 6px ${c.emerald}` }} />
-                            <p style={{ margin: 0, fontSize: '12px', color: c.textMuted }}>Online · Your personal shopping guide</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* ── MESSAGES ── */}
-            <div
-                className="chat-messages"
-                style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    padding: '90px 20px 110px',
-                    position: 'relative',
-                    zIndex: 1,
-                }}
+      <div className="bg-white rounded-3xl border border-line overflow-hidden shadow-xl shadow-primary/5 flex flex-col h-[calc(100vh-260px)] min-h-[420px]">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary to-emerald-600 text-white px-6 py-5 flex items-center gap-4">
+          <span className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+            <Bot size={26} />
+          </span>
+          <div className="flex-1">
+            <h1 className="font-extrabold text-lg">Bazar AI Assistant</h1>
+            <p className="text-xs text-white/85 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-lime-300 animate-pulse" />
+              Online · Knows every product in our store
+            </p>
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={() => dispatch(clearChat())}
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-xs font-bold px-3 py-2 rounded-full transition"
+              title="Clear chat"
             >
-                <div style={{ maxWidth: '780px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-                    {messages.map((message) => (
-                        <div
-                            key={message._id}
-                            className="msg-animate"
-                            style={{
-                                display: 'flex',
-                                justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
-                            }}
-                        >
-                            {/* AI avatar dot */}
-                            {message.sender === 'ai' && (
-                                <div style={{
-                                    width: '32px', height: '32px',
-                                    background: c.emeraldBg,
-                                    border: `1px solid ${c.border}`,
-                                    borderRadius: '50%',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    flexShrink: 0,
-                                    marginRight: '10px',
-                                    marginTop: '2px',
-                                }}>
-                                    <ShoppingBag style={{ width: '15px', height: '15px', color: c.emerald }} />
-                                </div>
-                            )}
-
-                            <div style={{
-                                maxWidth: '70%',
-                                padding: '12px 16px',
-                                borderRadius: message.sender === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                                background: message.sender === 'user'
-                                    ? 'linear-gradient(135deg, #34d399 0%, #059669 100%)'
-                                    : c.aiBubbleBg,
-                                border: message.sender === 'user' ? 'none' : `1px solid ${c.aiBubbleBorder}`,
-                                boxShadow: message.sender === 'user'
-                                    ? '0 0 20px rgba(52,211,153,0.2)'
-                                    : 'none',
-                            }}>
-                                <p style={{
-                                    margin: 0,
-                                    fontSize: '14px',
-                                    lineHeight: 1.6,
-                                    color: message.sender === 'user' ? '#030f07' : c.text,
-                                }}>
-                                    {message.text}
-                                </p>
-                                <p style={{
-                                    margin: 0,
-                                    fontSize: '11px',
-                                    marginTop: '6px',
-                                    color: message.sender === 'user' ? 'rgba(3,15,7,0.55)' : c.textFaint,
-                                }}>
-                                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* Typing indicator */}
-                    {chatLoading && (
-                        <div className="msg-animate" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                                width: '32px', height: '32px',
-                                background: c.emeraldBg,
-                                border: `1px solid ${c.border}`,
-                                borderRadius: '50%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0,
-                            }}>
-                                <ShoppingBag style={{ width: '15px', height: '15px', color: c.emerald }} />
-                            </div>
-                            <div style={{
-                                padding: '14px 18px',
-                                background: c.aiBubbleBg,
-                                border: `1px solid ${c.aiBubbleBorder}`,
-                                borderRadius: '18px 18px 18px 4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                            }}>
-                                <div className="dot1" style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.emerald }} />
-                                <div className="dot2" style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.emerald }} />
-                                <div className="dot3" style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.emerald }} />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Error message */}
-                    {chatError && (
-                        <div className="msg-animate" style={{
-                            padding: '10px 16px',
-                            background: 'rgba(226,75,74,0.08)',
-                            border: '1px solid rgba(226,75,74,0.25)',
-                            borderRadius: '12px',
-                            fontSize: '13px',
-                            color: '#f09595',
-                            textAlign: 'center',
-                        }}>
-                            ⚠️ {chatErrorMessage || 'Something went wrong. Please try again.'}
-                        </div>
-                    )}
-
-                    <div ref={messagesEndRef} />
-                </div>
-            </div>
-
-            {/* ── INPUT BAR ── */}
-            <div style={{
-                position: 'fixed',
-                bottom: 0,
-                width: '100%',
-                zIndex: 10,
-                background: c.headerBg,
-                borderTop: `1px solid ${c.border}`,
-                padding: '14px 20px 18px',
-                backdropFilter: 'blur(10px)',
-            }}>
-                <div style={{ maxWidth: '780px', margin: '0 auto' }}>
-                    <form
-                        onSubmit={handleSendMessage}
-                        style={{ display: 'flex', gap: '10px' }}
-                    >
-                        <input
-                            className="chat-input"
-                            type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Ask me anything... e.g. 'Where can I find bread?'"
-                            disabled={chatLoading}
-                        />
-                        <button
-                            type="submit"
-                            className="send-btn"
-                            disabled={chatLoading || !inputValue.trim()}
-                        >
-                            <span className="send-label">Send</span>
-                            <Send style={{ width: '15px', height: '15px' }} />
-                        </button>
-                    </form>
-                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: c.textFaint }}>
-                        💡 Try asking about products, stores, delivery times, or prices
-                    </p>
-                </div>
-            </div>
+              <Eraser size={13} /> Clear
+            </button>
+          )}
         </div>
-    );
+
+        {/* Messages */}
+        <div ref={bodyRef} className="flex-1 overflow-y-auto p-5 space-y-4 bg-surface/60">
+          {messages.length === 0 && (
+            <div className="py-6 animate-fade-up">
+              <div className="text-center">
+                <span className="inline-flex h-16 w-16 rounded-full bg-primary-light items-center justify-center text-3xl mb-4">
+                  🤖
+                </span>
+                <p className="font-extrabold text-xl">Hello! 👋 How can I help you shop?</p>
+                <p className="text-sm text-muted mt-1.5 max-w-sm mx-auto">
+                  Ask for product ideas, healthy combos, budget-friendly picks or anything else —
+                  I'll search the store for you.
+                </p>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-w-xl mx-auto">
+                {QUICK_START.map((q) => (
+                  <button
+                    key={q.label}
+                    onClick={() => send(q.msg)}
+                    disabled={!isAuthenticated || isLoading}
+                    className="flex items-center gap-2.5 bg-white rounded-2xl border border-line px-4 py-3 text-left hover:border-primary hover:shadow-md hover:-translate-y-0.5 transition disabled:opacity-50"
+                  >
+                    <span className="text-2xl">{q.icon}</span>
+                    <span>
+                      <span className="block text-sm font-bold">{q.label}</span>
+                      <span className="block text-[10px] text-muted">Ask AI</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => (
+            <div
+              key={i}
+              className={`flex ${m.from === "user" ? "justify-end" : "justify-start"} animate-fade-up`}
+            >
+              {m.from === "ai" && (
+                <span className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center mr-2 shrink-0 mt-1">
+                  <Bot size={15} />
+                </span>
+              )}
+              <div
+                className={`max-w-[80%] px-4 py-3 text-sm rounded-2xl shadow-sm ${
+                  m.from === "user"
+                    ? "bg-primary text-white rounded-br-md"
+                    : "bg-white text-ink rounded-bl-md"
+                }`}
+              >
+                {m.from === "ai" && <p className="text-[10px] font-bold text-primary mb-1">BAZAR AI</p>}
+                {m.text}
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="flex items-center gap-2 bg-white rounded-2xl px-4 py-3 w-fit shadow-sm">
+              <Spinner size="sm" />
+              <span className="text-xs text-muted">Searching the store...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Suggestions */}
+        <div className="px-5 py-3 bg-white border-t border-line no-scrollbar overflow-x-auto flex gap-2">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s.text}
+              onClick={() => send(s.text)}
+              disabled={!isAuthenticated || isLoading}
+              className="shrink-0 text-xs font-bold bg-surface px-3.5 py-2 rounded-full hover:bg-primary-light hover:text-primary transition disabled:opacity-50"
+            >
+              {s.icon} {s.text}
+            </button>
+          ))}
+        </div>
+
+        {/* Input */}
+        {isAuthenticated ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+            className="px-5 py-4 bg-white border-t border-line flex items-center gap-2"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder='Try "healthy breakfast ideas" or "milk"...'
+              className="flex-1 bg-surface rounded-2xl px-5 py-3.5 text-sm outline-none focus:ring-4 focus:ring-primary/15 border border-transparent focus:border-primary transition"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              className="h-12 w-12 rounded-2xl bg-primary text-white flex items-center justify-center hover:bg-primary-dark disabled:opacity-40 transition shrink-0"
+            >
+              <Send size={18} />
+            </button>
+          </form>
+        ) : (
+          <div className="px-5 py-4 bg-white border-t border-line">
+            <Link
+              to="/login"
+              className="block text-center bg-primary text-white font-bold py-3.5 rounded-2xl hover:bg-primary-dark transition"
+            >
+              Login to chat with AI assistant
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 bg-primary-light rounded-2xl p-4 flex items-start gap-3">
+        <Sparkles size={18} className="text-primary shrink-0 mt-0.5" />
+        <p className="text-xs text-primary-dark leading-relaxed">
+          <b>Pro tip:</b> Ask things like "Weekly sabzi list bana do" or "Weight loss diet ke liye
+          essentials?" — the AI gives you a curated list with prices & quantities from real stock.
+        </p>
+      </div>
+    </div>
+  );
 }

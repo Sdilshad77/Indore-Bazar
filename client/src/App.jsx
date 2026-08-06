@@ -1,72 +1,68 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Home from './pages/Home'
-import Header from './components/Header'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import { ToastContainer } from 'react-toastify'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminAllUsers from './pages/admin/AdminAllUsers'
-import AdminAllOrders from './pages/admin/AdminAllOrders'
-import AdminAllShops from './pages/admin/AdminAllShops'
-import PrivateComponent from './components/PrivateComponent'
-import PriveateAdminComponent from './components/PriveateAdminComponent'
-import ShopDashboard from './pages/shop/ShopDashBoard'
-import ShopOwnerProducts from './pages/shop/ShopOwnerProducts'
-import ShopOrders from './pages/shop/ShopOrders'
-import ShopCoupons from './pages/shop/ShopCoupons'
-import ShopProfile from './pages/shop/ShopProfile'
-import ProfilePage from './pages/Profile'
-import ProductDetails from './pages/SingleProductPage'
-import ProductsPage from './pages/AllProducts'
-import AllShops from './pages/AllShops'
-import ShopDetailsPage from './pages/ShopProfilePage'
-import Footer from './components/Footer'
-import CartPage from './pages/CartPage'
-import ChatPage from './pages/ChatPage'
-import ChatFab from './components/ChatButton'
-import RequestShopOwner from './components/RequestShopOwner'
-import OrderSuccess from './pages/OrderSuccess'
+import { Routes, Route } from "react-router-dom";
+import { ChatWidget } from "./components/ChatWidget.jsx";
+import Header from "./components/Header.jsx";
+import Footer from "./components/Footer.jsx";
+import PrivateRoute from "./components/PrivateRoute.jsx";
+import AdminRoute from "./components/AdminRoute.jsx";
+import Home from "./pages/Home.jsx";
+import Products from "./pages/Products.jsx";
+import ProductDetail from "./pages/ProductDetail.jsx";
+import ShopPage from "./pages/ShopPage.jsx";
+import CartPage from "./pages/CartPage.jsx";
+import CheckoutPage from "./pages/CheckoutPage.jsx";
+import OrderSuccess from "./pages/OrderSuccess.jsx";
+import MyOrders from "./pages/MyOrders.jsx";
+import OrderDetail from "./pages/OrderDetail.jsx";
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import Profile from "./pages/Profile.jsx";
+import ChatPage from "./pages/ChatPage.jsx";
+import ShopDashboard from "./pages/shop/ShopDashboard.jsx";
+import ShopProducts from "./pages/shop/ShopProducts.jsx";
+import ShopOrders from "./pages/shop/ShopOrders.jsx";
+import ShopCoupons from "./pages/shop/ShopCoupons.jsx";
+import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
+import AdminUsers from "./pages/admin/AdminUsers.jsx";
+import AdminOrders from "./pages/admin/AdminOrders.jsx";
+import AdminShops from "./pages/admin/AdminShops.jsx";
 
-const App = () => {
+export default function App() {
   return (
-    <BrowserRouter>
+    <div className="min-h-screen flex flex-col bg-surface">
       <Header />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path='/products' element={<ProductsPage />} />
-        <Route path='/products/:pid' element={<ProductDetails />} />
-        <Route path='/marketplace' element={<AllShops />} />
-        <Route path='/marketplace/:sid' element={<ShopDetailsPage />} />
-        <Route path='/chat' element={<ChatPage />} />
-        <Route path='/request-shop' element={<RequestShopOwner />} />
-        {/* Admin Routes */}
-        <Route path='/admin' element={<PriveateAdminComponent />} >
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="users" element={<AdminAllUsers />} />
-          <Route path="orders" element={<AdminAllOrders />} />
-          <Route path="shops" element={<AdminAllShops />} />
-        </Route>
-        {/* Shop Owner Routes */}
-        <Route path='/shop/dashboard' element={<ShopDashboard />} />
-        <Route path='/shop/products' element={<ShopOwnerProducts />} />
-        <Route path='/shop/orders' element={<ShopOrders />} />
-        <Route path='/shop/coupons' element={<ShopCoupons />} />
-        <Route path='/shop/profile' element={<ShopProfile />} />
-        {/* Auth Protected Routes */}
-        <Route path="/auth" element={<PrivateComponent />}>
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="cart" element={<CartPage />} />
-        </Route>
-        <Route path="/order-success" element={<OrderSuccess />} />
-      </Routes>
-      <ChatFab />
-      <Footer />
-      <ToastContainer />
-    </BrowserRouter>
-  )
-}
+      <main className="flex-1 pb-24 lg:pb-8">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/product/:pid" element={<ProductDetail />} />
+          <Route path="/shops/:sid" element={<ShopPage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/chat" element={<ChatPage />} />
 
-export default App
+          <Route element={<PrivateRoute />}>
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/order-success/:oid" element={<OrderSuccess />} />
+            <Route path="/orders" element={<MyOrders />} />
+            <Route path="/orders/:oid" element={<OrderDetail />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/seller/dashboard" element={<ShopDashboard />} />
+            <Route path="/seller/products" element={<ShopProducts />} />
+            <Route path="/seller/orders" element={<ShopOrders />} />
+            <Route path="/seller/coupons" element={<ShopCoupons />} />
+          </Route>
+
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/shops" element={<AdminShops />} />
+          </Route>
+        </Routes>
+      </main>
+      <Footer />
+      <ChatWidget />
+    </div>
+  );
+}

@@ -9,6 +9,6 @@ const router = express.Router()
 
 router.get("/", reviewController.getReviews)
 router.post("/", protect.forAuthUsers, reviewController.addReview)
-router.delete("/:rid", reviewController.removeReview)
+router.delete("/:rid", protect.forAuthUsers, reviewController.removeReview)
 
 export default router

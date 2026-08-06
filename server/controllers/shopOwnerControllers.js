@@ -52,8 +52,14 @@ const addShop = async (req, res) => {
 const updateShop = async (req, res) => {
     let shopId = req.params.sid
 
-    if (req.body.status) {
-        req.body.status = "pending"
+    // Shop owners can never change the approval status themselves
+    delete req.body.status
+
+    const shop = await Shop.findOne({ user: req.user._id })
+
+    if (!shop || shop._id.toString() !== shopId) {
+        res.status(403)
+        throw new Error("You can only update your own shop!")
     }
 
     const updatedShop = await Shop.findByIdAndUpdate(shopId, req.body, { new: true })
@@ -71,12 +77,27 @@ const addProduct = async (req, res) => {
     try {
         const { name, description, price, stock, category, shopId } = req.body;
 
-        console.log("Request Body:", req.body);
-
         if (!name || !description || !price || !stock || !category) {
             return res.status(409).json({
                 success: false,
                 message: "Please Fill All Details!",
+            });
+        }
+
+        // Product must belong to the seller's own shop
+        const myShop = await Shop.findOne({ user: req.user._id })
+
+        if (!myShop) {
+            return res.status(404).json({
+                success: false,
+                message: "Shop Not Found! Please create a shop first.",
+            });
+        }
+
+        if (shopId && shopId !== myShop._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only add products to your own shop!",
             });
         }
 
@@ -87,24 +108,6 @@ const addProduct = async (req, res) => {
             });
         }
 
-        console.log("========== FILE INFO ==========");
-        console.log("File Name:", req.file.originalname);
-        console.log("File Size:", req.file.size);
-        console.log("Mime Type:", req.file.mimetype);
-        console.log("Buffer Exists:", !!req.file.buffer);
-        console.log("Buffer Length:", req.file.buffer?.length);
-        console.log("===============================");
-
-        console.log("========== ENV ==========");
-        console.log("Cloud Name :", process.env.CLOUDINARY_CLOUD_NAME);
-        console.log("API Key    :", process.env.CLOUDINARY_API_KEY);
-        console.log(
-            "API Secret :",
-            process.env.CLOUDINARY_API_SECRET ? "Loaded ✅" : "Missing ❌"
-        );
-        console.log("=========================");
-
-        // Upload image to Cloudinary
         let uploadResponse;
 
         try {
@@ -112,12 +115,8 @@ const addProduct = async (req, res) => {
                 req.file.buffer,
                 req.file.mimetype
             );
-
-            console.log("Cloudinary Response:", uploadResponse);
         } catch (cloudErr) {
-            console.error("========== CLOUDINARY ERROR ==========");
-            console.error(cloudErr);
-            console.error("======================================");
+            console.error("Cloudinary Upload Error:", cloudErr.message);
 
             return res.status(500).json({
                 success: false,
@@ -133,16 +132,14 @@ const addProduct = async (req, res) => {
             stock,
             category,
             productImage: uploadResponse.secure_url,
-            shop: shopId,
+            shop: myShop._id,
         });
 
         await product.populate("shop");
 
         return res.status(201).json(product);
     } catch (err) {
-        console.error("========== ADD PRODUCT ERROR ==========");
-        console.error(err);
-        console.error("======================================");
+        console.error("Add Product Error:", err.message);
 
         return res.status(500).json({
             success: false,
@@ -154,9 +151,37 @@ const addProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
 
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.pid, req.body, { new: true }).populate('shop')
+    const { name, description, price, stock, category } = req.body
 
-    // Todo : Image Updation Pending
+    const myShop = await Shop.findOne({ user: req.user._id })
+
+    const existing = await Product.findById(req.params.pid)
+
+    if (!existing) {
+        res.status(404)
+        throw new Error('Product Not Found!')
+    }
+
+    if (!myShop || existing.shop.toString() !== myShop._id.toString()) {
+        res.status(403)
+        throw new Error('You can only update your own products!')
+    }
+
+    const updates = {}
+
+    if (name !== undefined) updates.name = name
+    if (description !== undefined) updates.description = description
+    if (price !== undefined) updates.price = price
+    if (stock !== undefined && stock !== "") updates.stock = stock
+    if (category !== undefined) updates.category = category
+
+    // Optional image replacement
+    if (req.file) {
+        const uploadResponse = await uploadToCloudinary(req.file.buffer, req.file.mimetype)
+        updates.productImage = uploadResponse.secure_url
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(req.params.pid, updates, { new: true }).populate('shop')
 
     if (!updatedProduct) {
         res.status(409)
@@ -180,9 +205,30 @@ const createCoupon = async (req, res) => {
         throw new Error("Please Enter All Fields!")
     }
 
+    if (isNaN(couponDiscount) || couponDiscount <= 0 || couponDiscount > 100) {
+        res.status(409)
+        throw new Error("Discount must be between 1 and 100 percent!")
+    }
+
     // Find My Shop
     const shop = await Shop.findOne({ user: userId })
 
+    if (!shop) {
+        res.status(404)
+        throw new Error("Shop Not Found! Please create a shop first.")
+    }
+
+    if (shop.status !== "accepted") {
+        res.status(409)
+        throw new Error("Your shop must be approved by admin before creating coupons!")
+    }
+
+    const couponExists = await Coupon.findOne({ couponCode: couponCode.toUpperCase() })
+
+    if (couponExists) {
+        res.status(409)
+        throw new Error("Coupon With This Code Already Exists!")
+    }
 
     const coupon = new Coupon({
         couponCode: couponCode.toUpperCase(),
@@ -215,7 +261,7 @@ const getMyShopOrders = async (req, res) => {
         throw new Error("Shop Not Found")
     }
 
-    let myAllOrders = await Order.find({ shop: shop._id }).populate("user").populate("products.product").populate("coupon")
+    let myAllOrders = await Order.find({ shop: shop._id }).populate("user", "-password").populate("products.product").populate("coupon")
 
     if (!myAllOrders) {
         res.status(404)
@@ -232,9 +278,26 @@ const updateOrder = async (req, res) => {
 
     let orderId = req.params.oid
 
+    let userId = req.user._id
+
+    let shop = await Shop.findOne({ user: userId })
+
+    if (!shop) {
+        res.status(404)
+        throw new Error("Shop Not Found")
+    }
+
     let order = await Order.findById(orderId).populate("products.product")
 
+    if (!order) {
+        res.status(404)
+        throw new Error("Order Not Found!")
+    }
 
+    if (order.shop.toString() !== shop._id.toString()) {
+        res.status(403)
+        throw new Error("This order does not belong to your shop!")
+    }
 
     let { status } = req.body
 
@@ -243,36 +306,38 @@ const updateOrder = async (req, res) => {
         throw new Error("Status Not Found!")
     }
 
-    // ["placed", "delivered", "dispatched", "cancelled"]
+    const validStatuses = ["placed", "dispatched", "delivered", "cancelled"]
 
-    const updateStock = async (productId, stock) => {
-        await Product.findByIdAndUpdate(productId, { stock: stock }, { new: true })
+    if (!validStatuses.includes(status)) {
+        res.status(400)
+        throw new Error("Invalid order status")
     }
 
+    if (status === order.status) {
+        res.status(409)
+        throw new Error(`Order is already ${status}`)
+    }
 
-    let updatedOrder
+    const populateQuery = [
+        { path: "user", select: "-password" },
+        { path: "products" },
+        { path: "coupon" },
+        { path: "shop" },
+    ]
 
-    // If Cancelled
+    // Stock is decremented at order placement (createOrder).
+    // Cancel → restore stock exactly once.
     if (status === "cancelled") {
-        updatedOrder = await Order.findByIdAndUpdate(req.params.oid, { status: "cancelled" }, { new: true }).populate("user").populate("products").populate("coupon").populate("shop")
-
-        // If Dispatched
-    } else if (status === "dispatched") {
-
-        // Updating Stock
-        order.products.forEach((product) => {
-            let productId = product.product._id
-            let productQty = product.qty
-            let currentStock = product.product.stock
-            updateStock(productId, currentStock - productQty)
-        })
-
-        updatedOrder = await Order.findByIdAndUpdate(req.params.oid, { status: "dispatched" }, { new: true }).populate("user").populate("products").populate("coupon").populate("shop")
-    } else {
-        updatedOrder = await Order.findByIdAndUpdate(req.params.oid, { status: "delivered" }, { new: true }).populate("user").populate("products").populate("coupon").populate("shop")
+        for (const item of order.products) {
+            await Product.findByIdAndUpdate(item.product._id, { $inc: { stock: item.qty } })
+        }
     }
 
-
+    const updatedOrder = await Order.findByIdAndUpdate(
+        req.params.oid,
+        { status },
+        { new: true }
+    ).populate(populateQuery)
 
     if (!updatedOrder) {
         res.status(401)
@@ -285,11 +350,22 @@ const updateOrder = async (req, res) => {
 
 
 const deleteProduct = async (req, res) => {
-    const product = await Product.findByIdAndDelete(req.params.pid)
+    const myShop = await Shop.findOne({ user: req.user._id })
+
+    const product = await Product.findById(req.params.pid)
+
     if (!product) {
         res.status(404)
         throw new Error("Product Not Found!")
     }
+
+    if (!myShop || product.shop.toString() !== myShop._id.toString()) {
+        res.status(403)
+        throw new Error("You can only delete your own products!")
+    }
+
+    await Product.findByIdAndDelete(req.params.pid)
+
     res.status(200).json({ _id: req.params.pid, message: "Product deleted successfully" })
 }
 

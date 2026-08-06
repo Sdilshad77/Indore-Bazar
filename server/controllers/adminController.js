@@ -1,9 +1,10 @@
 import Order from "../models/orderModel.js"
+import Product from "../models/productModel.js"
 import Shop from "../models/shopModel.js"
 import User from "../models/userModel.js"
 
 const getUsers = async (req, res) => {
-    const users = await User.find()
+    const users = await User.find().select("-password")
 
     if (!users) {
         res.status(404)
@@ -14,7 +15,7 @@ const getUsers = async (req, res) => {
 }
 
 const getAllOrders = async (req, res) => {
-    const allOrders = await Order.find().populate("user").populate("products.product").populate("coupon").populate('shop')
+    const allOrders = await Order.find().populate("user", "-password").populate("products.product").populate("coupon").populate('shop')
 
 
     if (!allOrders) {
@@ -28,13 +29,12 @@ const getAllOrders = async (req, res) => {
 
 const updateUser = async (req, res) => {
 
+    if (typeof req.body.isActive !== "boolean") {
+        res.status(409)
+        throw new Error('Please Send Status Of User')
+    }
 
-    // if (!req.body.isActive) {
-    //     res.status(409)
-    //     throw new Error('Please Send Status Of User')
-    // }
-
-    const updatedUser = await User.findByIdAndUpdate(req.params.uid, { isActive: req.body.isActive ? true : false }, { new: true })
+    const updatedUser = await User.findByIdAndUpdate(req.params.uid, { isActive: req.body.isActive }, { new: true, select: "-password" })
 
     if (!updatedUser) {
         res.status(409)
@@ -47,7 +47,7 @@ const updateUser = async (req, res) => {
 
 const getAllShops = async (req, res) => {
 
-    const shops = await Shop.find().populate("user")
+    const shops = await Shop.find().populate("user", "-password")
 
     if (!shops) {
         res.status(404)
@@ -62,22 +62,25 @@ const getAllShops = async (req, res) => {
 
 const updateShop = async (req, res) => {
 
-    if (!req.body.status) {
+    const { status } = req.body
+    const validStatuses = ["pending", "accepted", "rejected"]
+
+    if (!status || !validStatuses.includes(status)) {
         res.status(409)
-        throw new Error('Please Tell The Status!')
+        throw new Error('Please Send A Valid Status!')
     }
 
     let shopId = req.params.sid
 
-    const updatedShop = await Shop.findByIdAndUpdate(shopId, req.body, { new: true })
+    const updatedShop = await Shop.findByIdAndUpdate(shopId, { status }, { new: true })
 
     if (!updatedShop) {
         res.status(409)
         throw new Error('Shop Cannot Be Activated!')
     }
 
-    // Update The User
-    await User.findByIdAndUpdate(updatedShop.user, { isShopOwner: true }, { new: true })
+    // Update The User — seller flag only when shop is accepted
+    await User.findByIdAndUpdate(updatedShop.user, { isShopOwner: status === "accepted" }, { new: true })
 
     res.status(200).json(updatedShop)
 
@@ -97,16 +100,38 @@ const updateOrder = async (req, res) => {
         throw new Error('Invalid order status')
     }
 
+    const currentOrder = await Order.findById(req.params.oid)
+
+    if (!currentOrder) {
+        res.status(404)
+        throw new Error('Order not found')
+    }
+
+    // Prevent illegal transitions & double stock adjustments
+    if (currentOrder.status === status) {
+        res.status(409)
+        throw new Error('Order is already in this status')
+    }
+
+    // Cancel → restore stock (only once)
+    if (status === "cancelled" && currentOrder.status !== "cancelled") {
+        for (const item of currentOrder.products) {
+            await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } })
+        }
+    }
+
+    // Dispatch → decrement stock (never restores on later statuses)
+    if (status === "dispatched" && currentOrder.status === "placed") {
+        for (const item of currentOrder.products) {
+            await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.qty } })
+        }
+    }
+
     const updatedOrder = await Order.findByIdAndUpdate(
         req.params.oid,
         { status },
         { new: true }
-    ).populate("user").populate("products.product").populate("coupon").populate('shop')
-
-    if (!updatedOrder) {
-        res.status(404)
-        throw new Error('Order not found')
-    }
+    ).populate("user", "-password").populate("products.product").populate("coupon").populate('shop')
 
     res.status(200).json(updatedOrder)
 }
